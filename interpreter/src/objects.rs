@@ -1,6 +1,7 @@
 use crate::context::Context;
 use cel_parser::{ArithmeticOp, Atom, Expression, Member, RelationOp, UnaryOp};
 use core::ops;
+use rust_decimal::Decimal;
 use std::cmp::Ordering;
 use std::collections::HashMap;
 use std::convert::TryInto;
@@ -19,7 +20,7 @@ impl PartialOrd for CelMap {
 
 #[derive(Debug, Eq, PartialEq, Hash, Ord, PartialOrd)]
 pub enum CelKey {
-    Int(i32),
+    Integer(i64),
     Uint(u32),
     Bool(bool),
     String(Rc<String>),
@@ -31,8 +32,7 @@ impl TryInto<CelKey> for CelType {
     #[inline(always)]
     fn try_into(self) -> Result<CelKey, Self::Error> {
         match self {
-            CelType::Int(v) => Ok(CelKey::Int(v)),
-            CelType::UInt(v) => Ok(CelKey::Uint(v)),
+            CelType::Integer(v) => Ok(CelKey::Integer(v)),
             CelType::String(v) => Ok(CelKey::String(v)),
             CelType::Bool(v) => Ok(CelKey::Bool(v)),
             _ => unimplemented!(),
@@ -48,9 +48,8 @@ pub enum CelType {
     Function(Rc<String>, Option<Box<CelType>>),
 
     // Atoms
-    Int(i32),
-    UInt(u32),
-    Float(f64),
+    Integer(i64),
+    Decimal(Decimal),
     String(Rc<String>),
     Bytes(Rc<Vec<u8>>),
     Bool(bool),
@@ -120,14 +119,13 @@ impl<'a> CelType {
                     UnaryOp::Not => CelType::Bool(!expr.to_bool()),
                     UnaryOp::DoubleNot => CelType::Bool(expr.to_bool()),
                     UnaryOp::Minus => match expr {
-                        CelType::Int(i) => CelType::Int(-i),
-                        CelType::Float(i) => CelType::Float(-i),
+                        CelType::Integer(i) => CelType::Integer(-i),
+                        CelType::Decimal(i) => CelType::Decimal(-i),
                         _ => unimplemented!(),
                     },
                     UnaryOp::DoubleMinus => match expr {
-                        CelType::Int(_) => expr,
-                        CelType::UInt(_) => expr,
-                        CelType::Float(_) => expr,
+                        CelType::Integer(_) => expr,
+                        CelType::Decimal(_) => expr,
                         _ => unimplemented!(),
                     },
                 }
@@ -177,7 +175,7 @@ impl<'a> CelType {
             Member::Index(idx) => {
                 let idx = CelType::resolve(idx, ctx);
                 match (self, idx) {
-                    (CelType::List(items), CelType::Int(idx)) => {
+                    (CelType::List(items), CelType::Integer(idx)) => {
                         items.get(idx as usize).unwrap().clone()
                     }
                     _ => unimplemented!(),
@@ -218,9 +216,8 @@ impl<'a> CelType {
         match self {
             CelType::List(v) => !v.is_empty(),
             CelType::Map(v) => !v.map.is_empty(),
-            CelType::Int(v) => *v != 0,
-            CelType::UInt(v) => *v != 0,
-            CelType::Float(v) => *v != 0.0,
+            CelType::Integer(v) => *v != 0,
+            CelType::Decimal(v) => *v != Decimal::ZERO,
             CelType::String(v) => !v.is_empty(),
             CelType::Bytes(v) => !v.is_empty(),
             CelType::Bool(v) => *v,
@@ -234,9 +231,8 @@ impl From<&Atom> for CelType {
     #[inline(always)]
     fn from(atom: &Atom) -> Self {
         match atom {
-            Atom::Int(v) => CelType::Int(*v),
-            Atom::UInt(v) => CelType::UInt(*v),
-            Atom::Float(v) => CelType::Float(*v),
+            Atom::Integer(v) => CelType::Integer(*v),
+            Atom::Decimal(v) => CelType::Decimal(*v),
             Atom::String(v) => CelType::String(v.clone()),
             Atom::Bytes(v) => CelType::Bytes(v.clone()),
             Atom::Bool(v) => CelType::Bool(*v),
@@ -251,15 +247,12 @@ impl ops::Add<CelType> for CelType {
     #[inline(always)]
     fn add(self, rhs: CelType) -> Self::Output {
         match (self, rhs) {
-            (CelType::Int(l), CelType::Int(r)) => CelType::Int(l + r),
-            (CelType::UInt(l), CelType::UInt(r)) => CelType::UInt(l + r),
+            (CelType::Integer(l), CelType::Integer(r)) => CelType::Integer(l + r),
 
             // Float matrix
-            (CelType::Float(l), CelType::Float(r)) => CelType::Float(l + r),
-            (CelType::Int(l), CelType::Float(r)) => CelType::Float(l as f64 + r),
-            (CelType::Float(l), CelType::Int(r)) => CelType::Float(l + r as f64),
-            (CelType::UInt(l), CelType::Float(r)) => CelType::Float(l as f64 + r),
-            (CelType::Float(l), CelType::UInt(r)) => CelType::Float(l + r as f64),
+            (CelType::Decimal(l), CelType::Decimal(r)) => CelType::Decimal(l + r),
+            (CelType::Integer(l), CelType::Decimal(r)) => CelType::Decimal(Decimal::from(l) + r),
+            (CelType::Decimal(l), CelType::Integer(r)) => CelType::Decimal(l + Decimal::from(r)),
 
             (CelType::List(l), CelType::List(r)) => {
                 let new = l.iter().chain(r.iter()).cloned().collect();
@@ -283,15 +276,12 @@ impl ops::Sub<CelType> for CelType {
     #[inline(always)]
     fn sub(self, rhs: CelType) -> Self::Output {
         match (self, rhs) {
-            (CelType::Int(l), CelType::Int(r)) => CelType::Int(l - r),
-            (CelType::UInt(l), CelType::UInt(r)) => CelType::UInt(l - r),
+            (CelType::Integer(l), CelType::Integer(r)) => CelType::Integer(l - r),
 
             // Float matrix
-            (CelType::Float(l), CelType::Float(r)) => CelType::Float(l - r),
-            (CelType::Int(l), CelType::Float(r)) => CelType::Float(l as f64 - r),
-            (CelType::Float(l), CelType::Int(r)) => CelType::Float(l - r as f64),
-            (CelType::UInt(l), CelType::Float(r)) => CelType::Float(l as f64 - r),
-            (CelType::Float(l), CelType::UInt(r)) => CelType::Float(l - r as f64),
+            (CelType::Decimal(l), CelType::Decimal(r)) => CelType::Decimal(l - r),
+            (CelType::Integer(l), CelType::Decimal(r)) => CelType::Decimal(Decimal::from(l) - r),
+            (CelType::Decimal(l), CelType::Integer(r)) => CelType::Decimal(l - Decimal::from(r)),
 
             _ => unimplemented!(),
         }
@@ -304,15 +294,12 @@ impl ops::Div<CelType> for CelType {
     #[inline(always)]
     fn div(self, rhs: CelType) -> Self::Output {
         match (self, rhs) {
-            (CelType::Int(l), CelType::Int(r)) => CelType::Int(l / r),
-            (CelType::UInt(l), CelType::UInt(r)) => CelType::UInt(l / r),
+            (CelType::Integer(l), CelType::Integer(r)) => CelType::Integer(l / r),
 
             // Float matrix
-            (CelType::Float(l), CelType::Float(r)) => CelType::Float(l / r),
-            (CelType::Int(l), CelType::Float(r)) => CelType::Float(l as f64 / r),
-            (CelType::Float(l), CelType::Int(r)) => CelType::Float(l / r as f64),
-            (CelType::UInt(l), CelType::Float(r)) => CelType::Float(l as f64 / r),
-            (CelType::Float(l), CelType::UInt(r)) => CelType::Float(l / r as f64),
+            (CelType::Decimal(l), CelType::Decimal(r)) => CelType::Decimal(l / r),
+            (CelType::Integer(l), CelType::Decimal(r)) => CelType::Decimal(Decimal::from(l) / r),
+            (CelType::Decimal(l), CelType::Integer(r)) => CelType::Decimal(l / Decimal::from(r)),
 
             _ => unimplemented!(),
         }
@@ -325,15 +312,12 @@ impl ops::Mul<CelType> for CelType {
     #[inline(always)]
     fn mul(self, rhs: CelType) -> Self::Output {
         match (self, rhs) {
-            (CelType::Int(l), CelType::Int(r)) => CelType::Int(l * r),
-            (CelType::UInt(l), CelType::UInt(r)) => CelType::UInt(l * r),
+            (CelType::Integer(l), CelType::Integer(r)) => CelType::Integer(l * r),
 
             // Float matrix
-            (CelType::Float(l), CelType::Float(r)) => CelType::Float(l * r),
-            (CelType::Int(l), CelType::Float(r)) => CelType::Float(l as f64 * r),
-            (CelType::Float(l), CelType::Int(r)) => CelType::Float(l * r as f64),
-            (CelType::UInt(l), CelType::Float(r)) => CelType::Float(l as f64 * r),
-            (CelType::Float(l), CelType::UInt(r)) => CelType::Float(l * r as f64),
+            (CelType::Decimal(l), CelType::Decimal(r)) => CelType::Decimal(l * r),
+            (CelType::Integer(l), CelType::Decimal(r)) => CelType::Decimal(Decimal::from(l) * r),
+            (CelType::Decimal(l), CelType::Integer(r)) => CelType::Decimal(l * Decimal::from(r)),
 
             _ => unimplemented!(),
         }
@@ -346,15 +330,12 @@ impl ops::Rem<CelType> for CelType {
     #[inline(always)]
     fn rem(self, rhs: CelType) -> Self::Output {
         match (self, rhs) {
-            (CelType::Int(l), CelType::Int(r)) => CelType::Int(l % r),
-            (CelType::UInt(l), CelType::UInt(r)) => CelType::UInt(l % r),
+            (CelType::Integer(l), CelType::Integer(r)) => CelType::Integer(l % r),
 
             // Float matrix
-            (CelType::Float(l), CelType::Float(r)) => CelType::Float(l % r),
-            (CelType::Int(l), CelType::Float(r)) => CelType::Float(l as f64 % r),
-            (CelType::Float(l), CelType::Int(r)) => CelType::Float(l % r as f64),
-            (CelType::UInt(l), CelType::Float(r)) => CelType::Float(l as f64 % r),
-            (CelType::Float(l), CelType::UInt(r)) => CelType::Float(l % r as f64),
+            (CelType::Decimal(l), CelType::Decimal(r)) => CelType::Decimal(l % r),
+            (CelType::Integer(l), CelType::Decimal(r)) => CelType::Decimal(Decimal::from(l) % r),
+            (CelType::Decimal(l), CelType::Integer(r)) => CelType::Decimal(l % Decimal::from(r)),
 
             _ => unimplemented!(),
         }

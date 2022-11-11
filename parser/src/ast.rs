@@ -1,3 +1,4 @@
+use rust_decimal::Decimal;
 use std::rc::Rc;
 
 #[derive(Debug, Eq, PartialEq, Clone)]
@@ -57,9 +58,8 @@ pub enum Member {
 
 #[derive(Debug, PartialEq, Clone)]
 pub enum Atom {
-    Int(i32),
-    UInt(u32),
-    Float(f64),
+    Integer(i64),
+    Decimal(Decimal),
     String(Rc<String>),
     Bytes(Rc<Vec<u8>>),
     Bool(bool),
@@ -70,6 +70,7 @@ pub enum Atom {
 mod tests {
     use crate::parser::ExpressionParser;
     use crate::{Atom::*, Expression, Expression::*, Member::*};
+    use rust_decimal::Decimal;
 
     fn parse(input: &str) -> Expression {
         ExpressionParser::new()
@@ -83,12 +84,12 @@ mod tests {
 
     #[test]
     fn simple_int() {
-        assert_parse_eq("1", Atom(Int(1)))
+        assert_parse_eq("1", Atom(Integer(1)))
     }
 
     #[test]
     fn simple_float() {
-        assert_parse_eq("1.0", Atom(Float(1.0)))
+        assert_parse_eq("1.0", Atom(Decimal(Decimal::ONE)))
     }
 
     #[test]
@@ -101,7 +102,7 @@ mod tests {
                     Attribute("b".to_string().into()).into(),
                 )
                 .into(),
-                Index(Atom(Int(1)).into()).into(),
+                Index(Atom(Integer(1)).into()).into(),
             )
             .into(),
         )

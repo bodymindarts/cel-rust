@@ -11,5 +11,5 @@ pub fn size(target: Option<&CelType>, _args: &[Expression], _context: &Context) 
         CelType::Bytes(b) => b.len(),
         _ => unreachable!(),
     };
-    CelType::Int(result as i32)
+    CelType::Integer(result as i64)
 }

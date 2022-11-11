@@ -38,13 +38,13 @@ pub fn criterion_benchmark(c: &mut Criterion) {
         c.bench_function(name, |b| {
             let program = Program::compile(expr).expect("Parsing failed");
             let mut ctx = Context::default();
-            ctx.add_variable("TestDouble".into(), CelType::Float(0.0f64));
+            ctx.add_variable("TestDouble".into(), CelType::Decimal(0.0f64));
             ctx.add_variable(
                 "TestString".into(),
                 CelType::String("World".to_string().into()),
             );
-            ctx.add_variable("TestTime".into(), CelType::UInt(0));
-            ctx.add_variable("Now".into(), CelType::UInt(1));
+            ctx.add_variable("TestTime".into(), CelType::Integer(0));
+            ctx.add_variable("Now".into(), CelType::Integer(1));
             ctx.add_function("TestFunction".into(), |target, args, ctx| match target {
                 Some(CelType::String(v)) => CelType::String(format!("Hello{}", v).into()),
                 _ => unreachable!(),

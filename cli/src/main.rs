@@ -2,6 +2,7 @@ use anyhow::Result;
 use cel_interpreter::context::Context;
 use cel_interpreter::objects::CelType;
 use cel_interpreter::Program;
+use rust_decimal::Decimal;
 use rustyline::error::ReadlineError;
 use rustyline::Editor;
 
@@ -31,13 +32,13 @@ fn main() -> Result<()> {
                 let program = Program::compile(&line).unwrap();
                 let mut ctx = Context::default();
                 ctx.variables
-                    .insert("TestDouble".into(), CelType::Float(0.0f64));
+                    .insert("TestDouble".into(), CelType::Decimal(Decimal::ZERO));
                 ctx.variables.insert(
                     "TestString".into(),
                     CelType::String("World".to_string().into()),
                 );
-                ctx.variables.insert("TestTime".into(), CelType::UInt(0));
-                ctx.variables.insert("Now".into(), CelType::UInt(1));
+                ctx.variables.insert("TestTime".into(), CelType::Integer(0));
+                ctx.variables.insert("Now".into(), CelType::Integer(1));
                 ctx.add_function("TestFunction".into(), |target, _args, _ctx| match target {
                     Some(CelType::String(v)) => CelType::String(format!("Hello{}", v).into()),
                     _ => unreachable!(),
