@@ -12,7 +12,7 @@ pub struct CelMap {
 }
 
 impl PartialOrd for CelMap {
-    fn partial_cmp(&self, other: &Self) -> Option<Ordering> {
+    fn partial_cmp(&self, _other: &Self) -> Option<Ordering> {
         None
     }
 }
@@ -25,7 +25,7 @@ pub enum CelKey {
     String(Rc<String>),
 }
 
-impl<'a> TryInto<CelKey> for CelType {
+impl TryInto<CelKey> for CelType {
     type Error = ();
 
     #[inline(always)]

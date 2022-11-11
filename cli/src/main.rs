@@ -38,7 +38,7 @@ fn main() -> Result<()> {
                 );
                 ctx.variables.insert("TestTime".into(), CelType::UInt(0));
                 ctx.variables.insert("Now".into(), CelType::UInt(1));
-                ctx.add_function("TestFunction".into(), |target, args, ctx| match target {
+                ctx.add_function("TestFunction".into(), |target, _args, _ctx| match target {
                     Some(CelType::String(v)) => CelType::String(format!("Hello{}", v).into()),
                     _ => unreachable!(),
                 });

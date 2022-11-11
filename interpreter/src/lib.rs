@@ -32,7 +32,7 @@ impl Program {
     }
 
     pub fn execute(&self, context: &Context) -> CelType {
-        CelType::resolve(&self.expression, &context)
+        CelType::resolve(&self.expression, context)
     }
 }
 

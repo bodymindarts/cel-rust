@@ -3,10 +3,10 @@ use crate::objects::CelType;
 use cel_parser::Expression;
 use std::collections::HashMap;
 
+type ContextFn = Box<dyn Fn(Option<&CelType>, &[Expression], &Context) -> CelType>;
 pub struct Context {
     pub variables: HashMap<String, CelType>,
-    pub functions:
-        HashMap<String, Box<dyn Fn(Option<&CelType>, &[Expression], &Context) -> CelType>>,
+    pub functions: HashMap<String, ContextFn>,
 }
 
 impl Context {
